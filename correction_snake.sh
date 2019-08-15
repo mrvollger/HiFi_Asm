@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-source $DIR/env.cfg
+#source $DIR/env.cfg
 
 
 #
@@ -18,10 +18,7 @@ retry=0 # numer of times to retry the pipeline if it failes
 # QSUB parameters, these are only the defualts, they can be changed with params.sge_opts
 # Allow snakemake to make directories, I think it slows things down when I done with "waitTime"
 #
-logDir=sge_logs
-mkdir -p $logDir
-E=$logDir'/snakejob_{rule}_{wildcards}_e'
-O=$logDir'/snakejob_{rule}_{wildcards}_o'
+mkdir -p logs
 
 #
 # run snakemake
@@ -33,7 +30,7 @@ snakemake -p \
                 -l h_rt=150:00:00  \
                 -l mfree={resources.mem}G \
 				-pe serial {threads} \
-				-e $E -o $O \
+				-e {log.e} -o {log.o} \
 				-R y \
                 -V -cwd \
                 -S /bin/bash" \
