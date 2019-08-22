@@ -32,8 +32,8 @@ snakemake -p \
                 -l mfree={resources.mem}G \
 				-pe serial {threads} \
                 -V -cwd \
-				-e {log.e} -o {log.o} \
                 -S /bin/bash" \
+		 --drmaa-log-dir $logDir \
         --jobs $jobNum \
         --latency-wait $waitTime \
         --restart-times $retry  \
@@ -41,5 +41,6 @@ snakemake -p \
 
 # generate report 
 #snakemake -s $snakefile --report racon_report.html
+#-e {log.e} -o {log.o} \
 
 
