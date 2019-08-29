@@ -37,6 +37,8 @@ THREADS=4
 if("threads" in config):
 	THREADS = config["threads"]
 
+# window size to calcualte coverage in 
+WINDOW=1000
 
 SAMPLES = list(config.keys())
 if("threads" in SAMPLES): SAMPLES.remove("threads")
@@ -111,12 +113,23 @@ rule align:
 		mem = 8,
 		smem = 4
 	threads: THREADS
-	shell:"""
-SAM_TMP="{TMPDIR}/temp_{wildcards.SM}_{wildcards.ID}"
-rm -f $SAM_TMP*
-{params.cmd} \
-	{input.ref} {input.reads} | samtools view -F {params.flag} -u - | samtools sort -T $SAM_TMP -m {resources.smem}G -@ {threads} - > {output.bam}
-"""
+	run:
+		if( "minimap2" == params["cmd"].strip()[0:8] and ".bam" == input["reads"].strip()[-4:] ):
+			shell("""
+			SAM_TMP="{TMPDIR}/temp_{wildcards.SM}_{wildcards.ID}"
+			rm -f $SAM_TMP*
+			samtools fasta {input.reads} | \
+				{params.cmd} \
+				{input.ref} /dev/stdin | samtools view -F {params.flag} -u - | samtools sort -T $SAM_TMP -m {resources.smem}G -@ {threads} - > {output.bam}
+			""")
+		else:
+			shell("""
+			SAM_TMP="{TMPDIR}/temp_{wildcards.SM}_{wildcards.ID}"
+			rm -f $SAM_TMP*
+			{params.cmd} \
+				{input.ref} {input.reads} | samtools view -F {params.flag} -u - | samtools sort -T $SAM_TMP -m {resources.smem}G -@ {threads} - > {output.bam}
+			""")
+	
 
 
 rule merge:
@@ -153,6 +166,63 @@ rule index:
 	shell:"""
 samtools index {input.bam}
 """
+
+
+
+
+
+#
+# this rule creats a bed file that is incremented by 1000 for every contig
+# these will be the feautes upon which we calculate depth wtih bedtools
+#
+rule fai_to_bed:
+	input:
+		ref=get_ref,
+	output:
+		regions="temp/{SM}.regions.bed",
+	resources:
+		mem=16
+	threads: 1
+	run:
+		fai = open(input["ref"] + ".fai")
+		window = WINDOW
+		out = ""
+		for line in fai:
+				token = line.strip().split("\t")
+				length = int(token[1])
+				contig = token[0]
+				for start in range(0, length, window):
+						end = start + window -1
+						if(end > length):
+								end = length
+						out += "{}\t{}\t{}\n".format(contig, start, end)
+		open(output["regions"], "w+").write(out)
+
+
+rule bam_to_coverage:
+	input:
+		bam=rules.index.input.bam,
+		bai=rules.index.output.bai,
+		regions=rules.fai_to_bed.output.regions,
+	output:
+		cov="results/{SM}.coverage.bed",
+	resources:
+		mem=16
+	threads: 1
+	shell:"""
+# get coverage and then sort by contig and then pos
+bedtools coverage -bed -mean -sorted -a {input.regions} -b {input.bam} | \
+	sort -k 1,1 -k2,2n > {output.cov}
+"""
+
+
+rule coverage:
+	input: 
+		expand("results/{SM}.coverage.bed", SM=SAMPLES),
+	resources:
+		mem=16
+	threads: 1
+	
 
 
 
