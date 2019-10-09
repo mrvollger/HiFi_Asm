@@ -57,6 +57,7 @@ def get_bacs(wildcards):
 	return(config[SM]["bacs"])
 
 
+MAXT=16
 
 REF="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta"
 SD="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.merged.max.segdups.bed"
@@ -73,6 +74,7 @@ rule all:
 		sd_txt=expand("results/{SM}.SD.status.txt", SM=SDSMS),
 		# BAC results 
 		bac_tbl=expand("results/{SM}.bacs.to.asm.tbl", SM=BACSMS),
+		qv_sum = "results/qv_sum.txt",
 
 
 rule align_to_ref:
@@ -83,7 +85,7 @@ rule align_to_ref:
 		bam="results/{SM}.to.hg38.bam",
 	resources:
 		mem = 4
-	threads: 12
+	threads: MAXT
 	shell:"""
 minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
@@ -172,7 +174,7 @@ rule align_bac_to_ref:
 		names="temp/{SM}.bacs.in.sd.names",
 	resources:
 		mem = 6
-	threads: 6
+	threads: MAXT
 	shell:"""
 minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
@@ -190,13 +192,12 @@ rule align_bac_to_asm:
 		bam="results/{SM}.bacs.to.asm.bam",
 	resources:
 		mem = 6
-	threads: 6
+	threads: MAXT
 	shell:"""
 minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.asm} {input.bacs} | samtools view -F 2308 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
-
 
 rule bac_to_asm_tbl:
 	input:
@@ -210,6 +211,33 @@ rule bac_to_asm_tbl:
 	shell:"""
 {SNAKEMAKE_DIR}/scripts/samIdentity.py --header --tag {wildcards.SM} --mask {input.names} {input.bam} > {output.tbl}
 """
+
+rule make_qv_sum:
+	input:
+		bac_tbl=expand("results/{SM}.bacs.to.asm.tbl", SM=BACSMS),
+	output:
+		qv_sum = "results/qv_sum.txt",
+	resources:
+		mem = 6
+	threads: 1
+	run:
+		pd.options.mode.use_inf_as_na = True
+		out = ""
+		for tbl in input["bac_tbl"]:
+			sys.stderr.write(tbl + "\n")
+			df = pd.read_csv(tbl, sep="\t")
+			val = 1 - df["perID_by_all"]/100
+			df["qv"] = -10 * np.log10( val )
+			for mask in [True, False]:
+				
+				tmp = df[df["mask"] == mask]
+				perfect = tmp["qv"].isna()
+				out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
+		
+		open(output["qv_sum"], "w+").write(out)
+
+
+
 
 
 
