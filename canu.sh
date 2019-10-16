@@ -22,4 +22,5 @@ canu \
         maxMemory=$mem \
         -pacbio-corrected $(cat $hifi_fofn) 
 
-		
+# useGrid=false		\
+
