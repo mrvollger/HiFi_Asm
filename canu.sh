@@ -12,6 +12,7 @@ canu \
         -d asm \
         -p asm \
         genomeSize=3.1g \
+		gridEngineArrayMaxJobs=100 \
         correctedErrorRate=0.015 \
         ovlMerThreshold=75 \
         batOptions="-eg 0.01 -eM 0.01 -dg 6 -db 6 -dr 1 -ca 50 -cp 5" \
