@@ -54,4 +54,18 @@ If you want to run correction twice you can simple use to output of one correcti
     fofn: ccs.fastq.fofn
 ```
 
+## Examples for QC
+Make a file named `qc.yaml` and populate it like this:
+```
+HG002_wenger:
+    asm: asms/HG002_falcon_mixed.fasta
+	SD: True
+24X_CLR_Canu:
+    asm: ../downsample_clr/asm/CLR_24X_CHM13.contigs.fasta
+    bacs: ../data/CHM13/BACs/BACs.fasta
+```
+If the "bacs" tag is included for a sample it will estiamte the qv of BACs in unique and dup space.
+If SD is set to Ture it uses the Chaisson/Vollger Nat Meth. 2019 pipeline to estimate the % of resovled SDs.
+
+
 
