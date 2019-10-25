@@ -32,6 +32,8 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
+ALN_THREADS = 24
+
 
 configfile: "cor.yaml"
 SMS = list(config.keys())
@@ -110,11 +112,8 @@ checkpoint split_ref:
 		split = directory("temp/{SM}_split_ref/"),
 		#splitref=temp(expand("temp/{{SM}}_split_ref/{ID}.fasta", ID=IDs)),
 		#splitrgn=temp(expand("temp/{{SM}}_split_ref/{ID}.rgn", ID=IDs)),
-	log:
-		o="logs/{rule.name}_{SM}.o",
-		e="logs/{rule.name}_{SM}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}.b"
+		"logs/split_ref_{SM}.b"
 	resources:
 		mem=6
 	threads:1
@@ -145,15 +144,12 @@ rule minimap:
 		reads = get_reads,
 	output:
 		bam = temp("temp/{SM}_{READID}_alignments.bam"),
-	log:
-		o="logs/{rule.name}_{SM}_{READID}.o",
-		e="logs/{rule.name}_{SM}_{READID}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}_{READID}.b"
+		"logs/minimap_{SM}_{READID}.b"
 	resources:
-		mem=4,
-		smem=2,
-	threads:8
+		mem=8,
+		smem=8,
+	threads:ALN_THREADS
 	shell:"""
 minimap2  -a -x map-pb -m 5000 -t {threads} --secondary=no {input.ref}  {input.reads} \
 | samtools view -u -F 1796 - | \
@@ -173,11 +169,8 @@ rule merge_align:
 		bams = get_all_bams,
 	output:
 		bam = "temp/{SM}_alignments.bam",
-	log:
-		o="logs/{rule.name}_{SM}.o",
-		e="logs/{rule.name}_{SM}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}.b"
+		"logs/merge_align_{SM}.b"
 	resources:
 		mem=2
 	threads:8
@@ -190,11 +183,8 @@ rule index_merge_align:
 		bam = "temp/{SM}_alignments.bam",
 	output:
 		bai = "temp/{SM}_alignments.bam.bai",
-	log:
-		o="logs/{rule.name}_{SM}.o",
-		e="logs/{rule.name}_{SM}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}.b"
+		"logs/index_merge_align_{SM}.b"
 	resources:
 		mem=8
 	threads:1
@@ -213,11 +203,8 @@ rule split_bam_to_sam:
 		splitrgn="temp/{SM}_split_ref/{ID}.rgn",
 	output:
 		splitsam = temp("temp/{SM}_alignments/{ID}.sam"),
-	log:
-		o="logs/{rule.name}_{SM}_{ID}.o",
-		e="logs/{rule.name}_{SM}_{ID}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}_{ID}.b"
+		"logs/splot_bam_to_sam_{SM}_{ID}.b"
 	resources:
 		mem=4
 	threads:1
@@ -230,11 +217,8 @@ rule split_fastq:
 		splitsam = "temp/{SM}_alignments/{ID}.sam",
 	output:
 		splitfastq = temp("temp/{SM}_split_fasta/{ID}.fastq"),
-	log:
-		o="logs/{rule.name}_{SM}_{ID}.o",
-		e="logs/{rule.name}_{SM}_{ID}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}_{ID}.b"
+		"logs/split_fastq_{SM}_{ID}.b"
 	resources:
 		mem=4
 	threads:1
@@ -249,11 +233,8 @@ rule run_racon:
 		splitref= "temp/{SM}_split_ref/{ID}.fasta",
 	output:
 		splitracon= "temp/{SM}_split_cor/{ID}.fasta",
-	log:
-		o="logs/{rule.name}_{SM}_{ID}.o",
-		e="logs/{rule.name}_{SM}_{ID}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}_{ID}.b"
+		"logs/run_racon_{SM}_{ID}.b"
 	resources:
 		mem=8
 	threads:4
@@ -280,11 +261,8 @@ rule combine_cor:
 	output:
 		final = "{SM}_racon.fasta",
 		fai = "{SM}_racon.fasta.fai",
-	log:
-		o="logs/{rule.name}_{SM}.o",
-		e="logs/{rule.name}_{SM}.e",
 	benchmark:
-		"logs/{rule.name}_{SM}.b"
+		"logs/combine_cor_{SM}.b"
 	resources:
 		mem=8
 	threads:1
@@ -311,11 +289,8 @@ if(ALG == "pilon"):
 			ann = "{SM}_bwa_index/ref.ann",
 			pac = "{SM}_bwa_index/ref.pac",
 			bwt = "{SM}_bwa_index/ref.bwt",
-		log:
-			o="logs/{rule.name}_{SM}.o",
-			e="logs/{rule.name}_{SM}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}.b"
+			"logs/bwa_index_{SM}.b"
 		resources:
 			mem=16
 		threads:1
@@ -334,11 +309,8 @@ bwa index -b 500000000 {input.ref} -p {wildcards.SM}_bwa_index/ref
 			reads = readByID,
 		output:
 			bam = temp("temp/{SM}_{READID}_alignments.bam"),
-		log:
-			o="logs/{rule.name}_{SM}_{READID}.o",
-			e="logs/{rule.name}_{SM}_{READID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{READID}.b"
+			"logs/bwa_{SM}_{READID}.b"
 		resources:
 			mem=8,
 			sortmem=4,
@@ -358,11 +330,8 @@ samtools sort -T tmp_{wildcards.SM}_{wildcards.READID} -m {resources.sortmem}G -
 		output:
 			splitbam = temp("temp/{SM}_alignments/{ID}.bam"),
 			splitbai = temp("temp/{SM}_alignments/{ID}.bam.bai"),
-		log:
-			o="logs/{rule.name}_{SM}_{ID}.o",
-			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/split_bam_{SM}_{ID}.b"
 		resources:
 			mem=4
 		threads:1
@@ -383,7 +352,7 @@ samtools sort -T tmp_{wildcards.SM}_{wildcards.READID} -m {resources.sortmem}G -
 			o="logs/{rule.name}_{SM}_{ID}.o",
 			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/run_pilon_{SM}_{ID}.b"
 		resources:
 			mem=16
 		threads:1
@@ -401,11 +370,8 @@ java -Xmx16G -jar {PILON_JAR} --genome {input.splitref} --bam {input.splitbam} -
 		output:
 			final = "{SM}_pilon.fasta",
 			fai = "{SM}_pilon.fasta.fai",
-		log:
-			o="logs/{rule.name}_{SM}.o",
-			e="logs/{rule.name}_{SM}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}.b"
+			"logs/combine_cor_{SM}.b"
 		resources:
 			mem=8
 		threads:1
@@ -456,11 +422,8 @@ if(ALG in ["arrow", "quiver"] ):
 			xmls = expand( xmlpre + ".chunk{ID}." + xmlsuf, ID=IDs),
 		resources:
 			mem=32
-		log:
-			o="logs/{rule.name}_{SM}_{ID}.o",
-			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/xml_split_{SM}_{ID}.b"
 		threads:1
 		shell:"""
 mkdir -p temp/{wildcards.SM}_arrow_in
@@ -474,11 +437,8 @@ dataset split --contigs --chunks {chunks} --outdir temp/{wildcards.SM}_arrow_in 
 			xml = "{SM}_ref.xml",
 		resources:
 			mem=8
-		log:
-			o="logs/{rule.name}_{SM}_{ID}.o",
-			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/xml_ref_{SM}_{ID}.b"
 		threads:1
 		shell:"""
 dataset create --type ReferenceSet {output.xml} {input.ref}
@@ -493,20 +453,17 @@ dataset create --type ReferenceSet {output.xml} {input.ref}
 			fasta = "temp/{SM}_arrow_out/{ID}.fasta",
 			fastq = "temp/{SM}_arrow_out/{ID}.fastq",
 			vcf = "temp/{SM}_arrow_out/{ID}.vcf",
-		log:
-			o="logs/{rule.name}_{SM}_{ID}.o",
-			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/arrow_by_xml_{SM}_{ID}.b"
 		resources:
 			mem=lambda wildcards, attempt: 8 + 4*attempt, # tested and 4 is not enough for CCS input 
 		threads:6
 		shell:"""
-{{ variantCaller --log-level INFO -j {threads} \
+variantCaller --log-level INFO -j {threads} \
 	--algorithm {ALG} --noEvidenceConsensusCall lowercasereference \
 	--alignmentSetRefWindows -r {input.ref} \
 	-o {output.fasta} -o {output.fastq} -o {output.vcf}\
-	 {input.xml} ; }} &>> {log}
+	 {input.xml}
 """
 
 	rule merge_out:	
@@ -514,11 +471,8 @@ dataset create --type ReferenceSet {output.xml} {input.ref}
 			fasta = expand("temp/{SM}_arrow_out/{ID}.fasta", ID=IDs),
 		output:
 			final = "{SM}_corrected.fasta",
-		log:
-			o="logs/{rule.name}_{SM}_{ID}.o",
-			e="logs/{rule.name}_{SM}_{ID}.e",
 		benchmark:
-			"logs/{rule.name}_{SM}_{ID}.b"
+			"logs/merge_out_{SM}_{ID}.b"
 		resources:
 			mem=16
 		threads:1
