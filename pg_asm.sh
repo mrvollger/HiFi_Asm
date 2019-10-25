@@ -3,7 +3,7 @@ set -euxo pipefail
 
 # must load pg conda env first with the perigrine env 
 
-fofn=$1 # must be a local path 
+fofn=$1 # path to list of read files fasta/fastq (.gz)
 asm_dir=$2 # must be "./something"
 threads=24
 
