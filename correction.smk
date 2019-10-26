@@ -32,8 +32,7 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
-ALN_THREADS = 24
-
+ALN_THREADS = 16
 
 configfile: "cor.yaml"
 SMS = list(config.keys())
@@ -168,21 +167,23 @@ rule merge_align:
 		ref = get_ref,
 		bams = get_all_bams,
 	output:
-		bam = "temp/{SM}_alignments.bam",
+		bam = temp("temp/{SM}_alignments.bam"),
 	benchmark:
 		"logs/merge_align_{SM}.b"
 	resources:
 		mem=2
-	threads:8
-	shell:"""
-samtools merge -@ {threads} {output.bam} {input.bams}
-"""
+	threads:ALN_THREADS
+	run:
+		if(len(input["bams"]) == 1):
+			shell("ln {input.bams} {output.bam}")
+		else: 
+			shell("samtools merge -@ {threads} {output.bam} {input.bams}")
 
 rule index_merge_align:
 	input:
 		bam = "temp/{SM}_alignments.bam",
 	output:
-		bai = "temp/{SM}_alignments.bam.bai",
+		bai = temp("temp/{SM}_alignments.bam.bai"),
 	benchmark:
 		"logs/index_merge_align_{SM}.b"
 	resources:
@@ -232,7 +233,7 @@ rule run_racon:
 		splitfastq = "temp/{SM}_split_fasta/{ID}.fastq",
 		splitref= "temp/{SM}_split_ref/{ID}.fasta",
 	output:
-		splitracon= "temp/{SM}_split_cor/{ID}.fasta",
+		splitracon= temp("temp/{SM}_split_cor/{ID}.fasta"),
 	benchmark:
 		"logs/run_racon_{SM}_{ID}.b"
 	resources:
