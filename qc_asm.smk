@@ -223,19 +223,21 @@ rule make_qv_sum:
 	run:
 		pd.options.mode.use_inf_as_na = True
 		out = ""
-		for tbl in input["bac_tbl"]:
-			sys.stderr.write(tbl + "\n")
-			df = pd.read_csv(tbl, sep="\t")
-			val = 1 - df["perID_by_all"]/100
-			df["qv"] = -10 * np.log10( val )
-			for mask in [True, False]:
-				
-				tmp = df[df["mask"] == mask]
-				perfect = tmp["qv"].isna()
-				out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
-		
-		open(output["qv_sum"], "w+").write(out)
-
+		if("bac_tbl" in input): 
+			for tbl in input["bac_tbl"]:
+				sys.stderr.write(tbl + "\n")
+				df = pd.read_csv(tbl, sep="\t")
+				val = 1 - df["perID_by_all"]/100
+				df["qv"] = -10 * np.log10( val )
+				for mask in [True, False]:
+					
+					tmp = df[df["mask"] == mask]
+					perfect = tmp["qv"].isna()
+					out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
+			
+			open(output["qv_sum"], "w+").write(out)
+		else:
+			shell("touch {output.qv_sum}")
 
 
 
