@@ -57,7 +57,7 @@ def get_bacs(wildcards):
 	return(config[SM]["bacs"])
 
 
-MAXT=16
+MAXT=32
 
 REF="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta"
 SD="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.merged.max.segdups.bed"
@@ -194,7 +194,7 @@ rule align_bac_to_asm:
 		mem = 6
 	threads: MAXT
 	shell:"""
-minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.asm} {input.bacs} | samtools view -F 2308 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
@@ -223,7 +223,7 @@ rule make_qv_sum:
 	run:
 		pd.options.mode.use_inf_as_na = True
 		out = ""
-		if("bac_tbl" in input): 
+		if( len(input["bac_tbl"]) > 0 ): 
 			for tbl in input["bac_tbl"]:
 				sys.stderr.write(tbl + "\n")
 				df = pd.read_csv(tbl, sep="\t")
