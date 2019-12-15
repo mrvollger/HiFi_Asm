@@ -60,8 +60,8 @@ def get_bacs(wildcards):
 MAXT=32
 
 REF="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta"
-SD="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.merged.max.segdups.bed"
-SD10KB="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.merged.10k.slop.segdups.bed"
+SD=f"{SNAKEMAKE_DIR}/data/ucsc.merged.max.segdups.bed"
+SD10KB=f"{SNAKEMAKE_DIR}/data/ucsc.merged.10k.slop.segdups.bed"
 
 localrules: all
 
