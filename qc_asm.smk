@@ -223,7 +223,7 @@ rule make_qv_sum:
 	run:
 		pd.options.mode.use_inf_as_na = True
 		out = ""
-		if( len(input["bac_tbl"]) > 0 ): 
+		if( "bac_tbl" in input and len(input["bac_tbl"]) > 0 ): 
 			for tbl in input["bac_tbl"]:
 				sys.stderr.write(tbl + "\n")
 				df = pd.read_csv(tbl, sep="\t")
