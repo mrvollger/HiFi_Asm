@@ -195,7 +195,7 @@ rule align_bac_to_asm:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-m 10000 -z 10000,50 -r 500000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.asm} {input.bacs} | samtools view -F 2308 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
 
@@ -223,19 +223,32 @@ rule make_qv_sum:
 	run:
 		pd.options.mode.use_inf_as_na = True
 		out = ""
-		if( "bac_tbl" in input and len(input["bac_tbl"]) > 0 ): 
+		desc = []
+		if( len(BACSMS) > 0 ): 
 			for tbl in input["bac_tbl"]:
 				sys.stderr.write(tbl + "\n")
 				df = pd.read_csv(tbl, sep="\t")
 				val = 1 - df["perID_by_all"]/100
 				df["qv"] = -10 * np.log10( val )
-				for mask in [True, False]:
+				for mask in [False, True, "Total"]:
+					if(mask == "Total"):	
+						tmp = df
+						tag = mask
+					else:
+						tmp = df[df["mask"] == mask]
+						tag = "Unique"
+						if(mask):
+							tag = "SegDup"
 					
-					tmp = df[df["mask"] == mask]
 					perfect = tmp["qv"].isna()
-					out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
+					stats = tmp.qv.describe()
+					stats["Perfect"] = sum(perfect)
+					stats["Status"] = tag
+					desc.append(stats)
+					#out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
 			
-			open(output["qv_sum"], "w+").write(out)
+			
+			open(output["qv_sum"], "w+").write(tbl + "\n" + str(pd.DataFrame(desc))  + "\n\n" )
 		else:
 			shell("touch {output.qv_sum}")
 
