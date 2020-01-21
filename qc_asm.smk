@@ -223,9 +223,9 @@ rule make_qv_sum:
 	run:
 		pd.options.mode.use_inf_as_na = True
 		out = ""
-		desc = []
 		if( len(BACSMS) > 0 ): 
 			for tbl in input["bac_tbl"]:
+				desc = []
 				sys.stderr.write(tbl + "\n")
 				df = pd.read_csv(tbl, sep="\t")
 				val = 1 - df["perID_by_all"]/100
@@ -245,10 +245,9 @@ rule make_qv_sum:
 					stats["Perfect"] = sum(perfect)
 					stats["Status"] = tag
 					desc.append(stats)
-					#out += "{}\nPerfect\t{}\n{}\n\n".format(tbl, sum(perfect), tmp.qv.describe()   )
-			
-			
-			open(output["qv_sum"], "w+").write(tbl + "\n" + str(pd.DataFrame(desc))  + "\n\n" )
+				out += tbl + "\n" + str(pd.DataFrame(desc))  + "\n\n" 
+			open(output["qv_sum"], "w+").write(out)
+
 		else:
 			shell("touch {output.qv_sum}")
 
