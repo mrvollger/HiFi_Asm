@@ -36,14 +36,17 @@ configfile: "qc.yaml"
 SAMPLES = list(config.keys())
 print("Samples: ", SAMPLES, file=sys.stderr) 
 
-# samples that have BACs
+# samples that have BACs/want SD run/have SDA collapses
 BACSMS = []
 SDSMS = []
+COLSMS = []
 for SM in SAMPLES:
 	if("bacs" in config[SM]):
 		BACSMS.append(SM)
 	if("SD" in config[SM] and config[SM]["SD"] ):
 		SDSMS.append(SM)
+	if("collapse" in config[SM]):
+		COLSMS.append(SM)
 
 print("Samples that have BACs: ", BACSMS, file=sys.stderr) 
 
@@ -56,10 +59,14 @@ def get_bacs(wildcards):
 	SM = str(wildcards.SM)
 	return(config[SM]["bacs"])
 
+wildcard_constraints:
+	SM="|".join(SAMPLES)	
 
-MAXT=32
+
+MAXT=64
 
 REF="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta"
+FAI="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta.fai"
 SD=f"{SNAKEMAKE_DIR}/data/ucsc.merged.max.segdups.bed"
 SD10KB=f"{SNAKEMAKE_DIR}/data/ucsc.merged.10k.slop.segdups.bed"
 
@@ -87,7 +94,7 @@ rule align_to_ref:
 		mem = 4
 	threads: MAXT
 	shell:"""
-minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
@@ -176,7 +183,7 @@ rule align_bac_to_ref:
 		mem = 6
 	threads: MAXT
 	shell:"""
-minimap2 -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
 	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.bacs} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 
@@ -250,6 +257,159 @@ rule make_qv_sum:
 
 		else:
 			shell("touch {output.qv_sum}")
+
+
+
+rule make_ideogram:
+	input:
+		bed="results/{SM}.to.hg38.bed",
+	output:
+		pdf = "results/{SM}.ideogram.pdf"
+	conda:
+		"envs/karyo.yaml"
+	resources:
+		mem = 8
+	threads: 1
+	script:"""
+Rscript /net/eichler/vol26/home/mvollger/projects/ideogram/ideogram.R  --asm {input.bed} --plot {output.pdf}
+"""
+
+rule make_ideograms:
+	input:
+		bed=expand("results/{SM}.to.hg38.bed", SM=SAMPLES),
+	resources:
+		mem = 8
+	threads: 1
+
+
+
+
+
+
+#
+# Make a liftover chain
+#
+rule align_ref_to_asm:
+	input:
+		asm=REF,
+		ref=get_asm,
+	output:
+		bam="results/hg38.to.{SM}.bam",
+		bai="results/hg38.to.{SM}.bam.bai",
+	resources:
+		mem = 4
+	threads: MAXT
+	shell:"""
+minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+	-m 10000 -z 10000,50 -r 50000 -O 5,56 -E 4,1 -B 5 \
+	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
+samtools index {output.bam}
+"""
+
+
+rule make_chain:
+	input:
+		asm = get_asm ,
+		bam="results/hg38.to.{SM}.bam",
+		bai="results/hg38.to.{SM}.bam.bai",
+	output:
+		chain="results/{SM}.to.hg38.chain",
+	shell:"""
+{SNAKEMAKE_DIR}/scripts/bamtochain.py -i {input.bam} --fai {input.asm}.fai -o {output.chain}
+"""
+
+
+def get_collapse(wildcards):
+	SM = str(wildcards.SM)
+	return(config[SM]["collapse"])
+
+rule liftover:
+	input:
+		bed = get_collapse,
+		chain = rules.make_chain.output.chain, 	
+	output:
+		bed="results/{SM}.collapse.hg38.liftover.bed",
+		unbed="results/{SM}.collapse.hg38.unlifted.bed",
+	shell:"""
+{SNAKEMAKE_DIR}/scripts/liftOver -minMatch=0.25 {input.bed} {input.chain} {output.bed} {output.unbed}
+"""
+
+rule collapse_to_ref:
+	input:
+		ref=REF,
+		asm = get_asm,
+		bed = get_collapse,
+	output:
+		fasta = temp("temp/{SM}.collapse.fasta"),
+		bam=temp("temp/{SM}.collapse.to.hg38.bam"),
+	resources:
+		mem = 4
+	threads: MAXT
+	shell:"""
+bedtools getfasta -fi {input.asm} -bed {input.bed} > {output.fasta}
+minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+	 -z 10000,50 -r 50000 -O 5,56 -E 4,1 -B 5 \
+	 {input.ref} {output.fasta} | samtools view -F 2308 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
+"""
+
+rule collapse_to_ref_bed:
+	input:
+		bam="temp/{SM}.collapse.to.hg38.bam",
+	output:
+		bed="temp/{SM}.collapse.to.hg38.bed",
+	resources:
+		mem = 4
+	threads: 1
+	shell:"""
+bedtools bamtobed -i {input.bam} > {output.bed}
+"""
+
+
+rule col_merge:
+	input:
+		lo=rules.collapse_to_ref_bed.output.bed,
+		bed = get_collapse,
+		fai = FAI,
+	output:
+		bed="results/{SM}.collapse.to.hg38.bed",
+	resources:
+		mem = 8
+	threads: 1
+	run:
+		cnames = ["chr", "start", "end", "mean", "median", "cmr", "length"]
+		col = pd.read_csv(input["bed"], sep="\t", header=None, names=cnames)	
+		col["qname"] = col["chr"] + ":" + col["start"].astype(str) + "-" +col["end"].astype(str)
+		cnames = ["chr", "start", "end", "qname", "qual", "strand"]
+		lo = pd.read_csv(input["lo"], sep="\t", header=None, names = cnames)	
+		
+		cnames = ["chr", "start", "end", "qname", "qual", "strand"]
+		fai = pd.read_csv(input["lo"], sep="\t", header=None, names = cnames)	
+			
+		# merge dataframes 
+		df = col.merge(lo, how="left", on = "qname", suffixes=("_asm", "_ref"))
+		# reorder columns 
+		df = df[["chr_ref", "start_ref", "end_ref"] + list(df)[0:6] ]
+	
+		# valid chromosomes 
+		chrs = [  "chr{}".format(x) for x in list(range(1,23)) + ["X", "Y"] ]
+		unknown = ~df.chr_ref.isin(chrs)
+		df.chr_ref[ unknown ]= "Unknown"
+		cur = 0
+		for idx, row in df[unknown].iterrows():
+			df.loc[idx, "start_ref"] = cur
+			cur += row["end_asm"] - row["start_asm"]
+			df.loc[idx, "end_ref" ]	= cur  
+			cur += 1
+		df[["start_ref", "end_ref"]] = df[["start_ref", "end_ref"]].astype(int)
+		df.to_csv(output["bed"], sep="\t", index=False)
+
+
+rule collapses:
+	input:
+		lo=expand(rules.col_merge.output.bed, SM=COLSMS),
+	resources:
+		mem = 8
+	threads: 1
 
 
 

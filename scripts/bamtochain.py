@@ -10,6 +10,7 @@ import argparse
 import gzip
 import pandas as pd
 import pysam
+import sys
 
 # CIGAR ID to string
 AS_CIGAR_ID = {
@@ -26,6 +27,7 @@ AS_CIGAR_ID = {
     10: 'NM'
 }
 
+MATCH_SET = ['BAM_CMATCH', 'BAM_CEQUAL', 'BAM_CDIFF']
 
 def encoder_plain(line):
     """
@@ -80,12 +82,13 @@ if __name__ == '__main__':
         read_set = set()
 
     # Read chromosome sizes
-    size_table = pd.read_table(
+    size_table = pd.read_csv(
         cmd_args.fai_file, header=None,
         names=('CHROM', 'SIZE', 'START', 'LINE_CHAR', 'LINE_BYTES'),
         usecols=('CHROM', 'SIZE'),
         index_col='CHROM',
-        squeeze=True
+        squeeze=True,
+		sep="\t"
     )
 
     # Read input file
@@ -105,6 +108,7 @@ if __name__ == '__main__':
             for record in in_file:
 
                 record_count += 1
+                sys.stderr.write("\rRecords: {}".format(record_count))
 
                 # Process if read is in the read set or if the read set is empty
                 if read_set and record.query_name not in read_set:
@@ -123,14 +127,14 @@ if __name__ == '__main__':
                 if cigar_list[0][0] == 'BAM_CSOFT_CLIP':
                     clip_up = cigar_list[0][1]
 
-                    if cigar_list[1][0] != 'BAM_CMATCH':
+                    if cigar_list[1][0] not in MATCH_SET: #!= 'BAM_CMATCH'
                         raise RuntimeError(
                             'First CIGAR op after BAM_CSOFT_CLIP must be BAM_CMATCH: record={}, {}'.format(
                                 record_count, record.cigarstring
                             )
                         )
                 else:
-                    if cigar_list[0][0] != 'BAM_CMATCH':
+                    if cigar_list[0][0] not in MATCH_SET: #!= 'BAM_CMATCH':
                         raise RuntimeError(
                             'First CIGAR op must be BAM_CSOFT_CLIP or BAM_CMATCH: record={}, {}'.format(
                                 record_count, record.cigarstring
@@ -143,14 +147,14 @@ if __name__ == '__main__':
                 if cigar_list[-1][0] == 'BAM_CSOFT_CLIP':
                     clip_dn = cigar_list[-1][1]
 
-                    if cigar_list[-2][0] != 'BAM_CMATCH':
+                    if cigar_list[-2][0] not in MATCH_SET: #!= 'BAM_CMATCH':
                         raise RuntimeError(
                             'Last CIGAR op before BAM_CSOFT_CLIP must be BAM_CMATCH: record={}, {}'.format(
                                 record_count, record.cigarstring
                             )
                         )
                 else:
-                    if cigar_list[-1][0] != 'BAM_CMATCH':
+                    if cigar_list[-1][0] not in MATCH_SET: #!= 'BAM_CMATCH':
                         raise RuntimeError(
                             'Last CIGAR op must be BAM_CSOFT_CLIP or BAM_CMATCH: record={}, {}'.format(
                                 record_count, record.cigarstring
@@ -180,7 +184,7 @@ if __name__ == '__main__':
                 for cigar_op, cigar_len in cigar_list:
 
                     # Match
-                    if cigar_op == 'BAM_CMATCH':
+                    if cigar_op in MATCH_SET: #== 'BAM_CMATCH':
 
                         # Write previous block
                         if block_record is not None:

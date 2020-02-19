@@ -7,6 +7,8 @@ fofn=$1 # path to list of read files fasta/fastq (.gz)
 asm_dir=$2 # must be "./something"
 threads=24
 
+mkdir -p $asm_dir
+
 DATE=$(date +'%Y%m%d')
 USER_N=$(whoami)
 tmp_dir=/tmp/${USER_N}_${DATE}/pg_asms
@@ -34,11 +36,11 @@ if [ -f $asm_dir/p_ctg_cns.fa ]; then
         popd
 
         # remove a lot of stuff
-		rm $fofn
+		rm $tmp_dir/$fofn
         rm -rf $tmp_dir/$asm_dir/0-seqdb  $tmp_dir/$asm_dir/1-index  $tmp_dir/$asm_dir/2-ovlp
 
         # move results off of the SSD
-        mv $tmp_dir/$asm_dir .
+        mv $tmp_dir/$asm_dir/* $asm_dir/.
 
 else
         echo "PG FAILED"
