@@ -30,6 +30,7 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
+MINALNSCORE=2*100000
 
 configfile: "qc.yaml"
 
@@ -63,7 +64,7 @@ wildcard_constraints:
 	SM="|".join(SAMPLES)	
 
 
-MAXT=64
+MAXT=48
 
 REF="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta"
 FAI="/net/eichler/vol26/projects/sda_assemblies/nobackups/assemblies/hg38/ucsc.hg38.no_alts.fasta.fai"
@@ -95,7 +96,7 @@ rule align_to_ref:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-s {MINALNSCORE} -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
 
@@ -120,7 +121,7 @@ rule bed_align_to_ref:
 		mem = 8
 	threads: 1
 	shell:"""
-bedtools bamtobed -i {input.bam} | bedtools sort -i - | cut -f 1,2,3,4,5 > {output.bed}
+bedtools bamtobed -i {input.bam} | bedtools sort -i - > {output.bed}
 """
 
 rule sd_align_to_ref:
@@ -184,7 +185,7 @@ rule align_bac_to_ref:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-m 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-s 10000 -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.bacs} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 
 bedtools intersect -a {output.bam} -b {input.sd} | samtools view - | awk '{{print $1}}' > {output.names}
@@ -202,7 +203,7 @@ rule align_bac_to_asm:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-m 10000 -z 10000,50 -r 500000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-s 10000 -z 10000,50 -r 500000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.asm} {input.bacs} | samtools view -F 2308 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
 
@@ -301,7 +302,7 @@ rule align_ref_to_asm:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-m 10000 -z 10000,50 -r 50000 -O 5,56 -E 4,1 -B 5 \
+	-s 10000 -z 10000,50 -r 50000 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 samtools index {output.bam}
 """
