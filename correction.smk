@@ -150,7 +150,7 @@ rule minimap:
 		smem=8,
 	threads:ALN_THREADS
 	shell:"""
-minimap2  -a -x map-pb -m 5000 -t {threads} --secondary=no {input.ref}  {input.reads} \
+minimap2  -a -x map-pb -s 2500 -t {threads} --secondary=no {input.ref}  {input.reads} \
 | samtools view -u -F 1796 - | \
 samtools sort -m {resources.smem}G -@ {threads} - > {output.bam} 
 """
