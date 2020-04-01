@@ -30,7 +30,7 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
-MINALNSCORE=2*100000
+MINALNSCORE=2*10000
 
 configfile: "qc.yaml"
 
@@ -96,7 +96,8 @@ rule align_to_ref:
 	threads: MAXT
 	shell:"""
 minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
-	-s {MINALNSCORE} -z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-s {MINALNSCORE} \
+	-z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
 
@@ -137,7 +138,7 @@ rule sd_align_to_ref:
 		mem = 8
 	threads: 1
 	shell:"""
-bedtools intersect -a {input.bed} -b {input.sd} -wa -wb > {output.inter}
+bedtools intersect -a <( cut -f 1,2,3,4,5 {input.bed} )  -b {input.sd} -wa -wb > {output.inter}
 {SNAKEMAKE_DIR}/scripts/PrintResolvedSegdups.py {output.inter} {input.sd} \
 	--extra 50000 \
 	--resolved {output.rbed} \
@@ -229,7 +230,7 @@ rule make_qv_sum:
 		mem = 6
 	threads: 1
 	run:
-		pd.options.mode.use_inf_as_na = True
+		#pd.options.mode.use_inf_as_na = True
 		out = ""
 		if( len(BACSMS) > 0 ): 
 			for tbl in input["bac_tbl"]:
@@ -248,7 +249,7 @@ rule make_qv_sum:
 						if(mask):
 							tag = "SegDup"
 					
-					perfect = tmp["qv"].isna()
+					perfect = tmp["qv"].isin([np.inf])
 					stats = tmp.qv.describe()
 					stats["Perfect"] = sum(perfect)
 					stats["Status"] = tag
