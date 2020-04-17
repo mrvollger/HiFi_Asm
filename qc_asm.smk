@@ -267,12 +267,11 @@ rule make_ideogram:
 		bed="results/{SM}.to.hg38.bed",
 	output:
 		pdf = "results/{SM}.ideogram.pdf"
-	conda:
-		"envs/karyo.yaml"
 	resources:
 		mem = 8
 	threads: 1
-	script:"""
+	conda: "envs/karyo.yaml"
+	shell:"""
 Rscript /net/eichler/vol26/home/mvollger/projects/ideogram/ideogram.R  --asm {input.bed} --plot {output.pdf}
 """
 
