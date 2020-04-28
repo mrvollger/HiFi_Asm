@@ -30,7 +30,7 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
-MINALNSCORE=2*10000
+MINALNSCORE=2*100000
 
 configfile: "qc.yaml"
 
@@ -95,9 +95,10 @@ rule align_to_ref:
 		mem = 4
 	threads: MAXT
 	shell:"""
-minimap2 -I 8G -t {threads} --secondary=no -a --eqx -Y -x asm20 \
+minimap2 -I 8G -2K 1500m -t {threads} \
+	--secondary=no -a --eqx -Y -x asm20 \
 	-s {MINALNSCORE} \
-	-z 10000,50 -r 50000 --end-bonus=100 -O 5,56 -E 4,1 -B 5 \
+	-z 10000,1000 -r 50000 -O 5,56 -E 4,1 -B 5 \
 	 {input.ref} {input.asm} | samtools view -F 260 -u - | samtools sort -m {resources.mem}G -@ {threads} - > {output.bam}
 """
 
@@ -277,7 +278,7 @@ Rscript /net/eichler/vol26/home/mvollger/projects/ideogram/ideogram.R  --asm {in
 
 rule make_ideograms:
 	input:
-		bed=expand("results/{SM}.to.hg38.bed", SM=SAMPLES),
+		bed=expand(rules.make_ideogram.output.pdf, SM=SAMPLES),
 	resources:
 		mem = 8
 	threads: 1
