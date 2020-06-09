@@ -6,6 +6,7 @@ parser.add_argument("samfile", help="input sam or bam file" )
 #parser.add_argument("",help="",default=None)
 parser.add_argument('-d', action="store_true", default=False)
 parser.add_argument("--header", action="store_true", default=False)
+parser.add_argument("--bed", action="store_true", default=False)
 parser.add_argument("--tag", help="ID tag to add to each row", default=None)
 parser.add_argument("--mask", help="a list of query names to add a mask flag == True for", default=None)
 args = parser.parse_args()
@@ -26,8 +27,16 @@ def makeHeader():
 			"perID_by_matches", "perID_by_events", "perID_by_all", 
 			"matches", "mismatches", 
 			"insertions", "deletions", "insertion_events", "deletion_events"]
-
 	return(rtn)
+
+def bedHeader():
+	rtn = ["reference_name", "reference_start", "reference_end",
+			"query_name", "query_start", "query_end", "query_length",
+			"perID_by_matches", "perID_by_events", "perID_by_all", 
+			"matches", "mismatches", 
+			"insertions", "deletions", "insertion_events", "deletion_events"]
+	return(rtn)
+
 
 def perId(matches, mismatch, ins, dele, insEvent, delEvent):
 	if( (matches + mismatch) == 0):
@@ -123,8 +132,12 @@ if(args.mask is not None):
 	for idx, row in df.iterrows():
 		if(row["query_name"] in tomask):
 			df["mask"].iat[idx] = True
-
-df.to_csv(sys.stdout, sep ="\t", header=args.header, index=False)
+if(args.bed):
+	header = bedHeader()
+	header[0] = "#"+header[0]  
+	df[bedHeader()].to_csv(sys.stdout, sep ="\t", header=header, index=False)
+else:
+	df.to_csv(sys.stdout, sep ="\t", header=args.header, index=False)
 
 
 
