@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/env.cfg
 
@@ -23,26 +24,24 @@ mkdir -p $logDir
 # run snakemake
 #
 
-# make a new pipe for tee
-exec 3>&1 
-
-# unbuffer keeps the colors for tee
-unbuffer snakemake -p \
+snakemake -p \
         -s $snakefile \
         --drmaa " -P eichlerlab \
                 -q eichler-short.q \
                 -l h_rt=48:00:00  \
                 -l mfree={resources.mem}G \
-				-pe serial {threads} \
+        				-pe serial {threads} \
+                -w n \
                 -V -cwd \
                 -S /bin/bash" \
-		 --drmaa-log-dir $logDir \
+        --drmaa-log-dir $logDir \
         --jobs $jobNum \
         --latency-wait $waitTime \
         --restart-times $retry  \
-         $@ 2>&1 >&3 | tee snakemake.aln.stderr.txt
+         $@ ||  \
+         mail -s "Snakemake alignment failed" $USER@uw.edu  < "Alignment failed!"
 
 # sends an email to the user that we are done
-mail -s "snakemake alignment finished" $USER@uw.edu  < snakemake.aln.stderr.txt
+mail -s "snakemake alignment finished" $USER@uw.edu  < "Alignment done!"
 
 

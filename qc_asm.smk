@@ -30,11 +30,19 @@ elif os.path.exists(SSD_TMP_DIR):
 else:
     TMPDIR = tempfile.gettempdir()
 
-MINALNSCORE=2*100000
 
 configfile: "qc.yaml"
 
+
+
 SAMPLES = list(config.keys())
+if("minscore" in SAMPLES):
+	MINALNSCORE = config["minscore"]
+	SAMPLES.remove("minscore")	
+else:
+	MINALNSCORE=2*100000
+
+
 print("Samples: ", SAMPLES, file=sys.stderr) 
 
 # samples that have BACs/want SD run/have SDA collapses
